@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editorial Design — Kaola Abidi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <style>
+        @font-face {
+            font-family: 'Ginger';
+            src: url('fonts/Ginger-font.woff') format('woff'),
+                 url('fonts/Ginger.ttf') format('truetype');
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: #000;
+            overflow: hidden;
+            width: 100vw; height: 100vh;
+            font-family: 'Inter', sans-serif;
+            /* Empêche la sélection de texte (le surlignage bleu) pendant le drag */
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+
+        header {
+            position: fixed; top: 0; left: 0; right: 0;
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 24px 40px; z-index: 1000;
+        }
+        .logo a { color: #fff; text-decoration: none; font-size: 13px; font-weight: 400; transition: opacity 0.3s; }
+        .logo a:hover { opacity: 0.4; }
+        nav { display: flex; gap: 50px; }
+        nav a { color: #fff; text-decoration: none; font-size: 13px; font-weight: 400; transition: opacity 0.3s; }
+        nav a:hover { opacity: 0.4; }
+
+        .back-btn {
+            position: fixed; bottom: 30px; left: 40px; z-index: 1000;
+            font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase;
+            color: rgba(255,255,255,0.3); text-decoration: none; transition: opacity 0.3s;
+        }
+        .back-btn:hover { opacity: 0.7; }
+
+        /* ── CANVAS ── */
+        .canvas-wrap {
+            position: fixed; inset: 0;
+            overflow: hidden;
+        }
+
+        /* Le filtre SVG s'applique ici */
+        .canvas-filtered {
+            position: absolute; inset: 0;
+            will-change: filter, transform;
+        }
+
+        .canvas-world {
+            position: absolute; top: 0; left: 0;
+            transform-origin: 0 0;
+            will-change: transform;
+        }
+
+        /* ── ENTRANCE ── */
+        @keyframes imgIn {
+            from { opacity: 0; transform: scale(0.88) translateY(18px); }
+            to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .cimg {
+            position: absolute; overflow: hidden; background: #111;
+            transition: box-shadow 0.3s ease;
+            animation: imgIn 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+            /* Ajout d'une fine bordure au cas où l'image n'est pas encore chargée */
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .cimg:hover {
+            box-shadow: 0 0 0 1px rgba(217,191,197,0.3), 0 20px 60px rgba(0,0,0,0.8);
+            z-index: 50;
+        }
+        .cimg img {
+            width: 100%; height: 100%; object-fit: cover; display: block;
+            pointer-events: none; transition: transform 0.5s ease;
+        }
+        .cimg:hover img { transform: scale(1.04); }
+        
+        .cimg-caption {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            padding: 10px 12px; font-size: 9px; letter-spacing: 0.12em;
+            text-transform: uppercase; color: transparent;
+            background: linear-gradient(transparent, rgba(0,0,0,0.7));
+            transition: color 0.3s; pointer-events: none;
+        }
+        .cimg:hover .cimg-caption { color: rgba(255,255,255,0.5); }
+
+        /* ── MINIMAP silhouettes ── */
+        .mm-img {
+            position: absolute;
+            background: rgba(255,255,255,0.25);
+            pointer-events: none;
+        }
+        .minimap {
+            position: fixed; bottom: 30px; right: 40px;
+            /* Légèrement plus carré pour correspondre au nouveau ratio */
+            width: 130px; height: 100px;
+            background: transparent;
+            z-index: 1000; overflow: hidden;
+        }
+        .minimap-viewport {
+            position: absolute; border: 1px solid rgba(217,191,197,0.7);
+            background: rgba(217,191,197,0.08); pointer-events: none; z-index: 2;
+        }
+
+        .canvas-hint {
+            position: fixed; bottom: 38px; left: 50%; transform: translateX(-50%);
+            font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase;
+            color: rgba(255,255,255,0.15); pointer-events: none; z-index: 1000;
+            transition: opacity 1s ease; white-space: nowrap;
+        }
+        .canvas-hint.hidden { opacity: 0; }
+    </style>
+        <script src="loader.js"></script>
+
+</head>
+<body>
+
+    <!-- Filtre SVG de déformation sphérique -->
+    <svg width="0" height="0" style="position:absolute">
+        <defs>
+            <filter id="sphere-filter" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+                <!-- Gradient radial qui crée le bump map -->
+                <feImage id="bump-map" result="bump" preserveAspectRatio="xMidYMid slice"/>
+                <!-- Displacement map : déforme l'image selon le bump -->
+                <feDisplacementMap in="SourceGraphic" in2="bump"
+                    scale="0" xChannelSelector="R" yChannelSelector="G"
+                    id="displace" result="displaced"/>
+            </filter>
+        </defs>
+    </svg>
+
+    <header>
+        <div class="logo"><a href="index.html">KAOLA ABIDI</a></div>
+        <nav>
+            <a href="about.html">ABOUT</a>
+            <a href="index.html#works">WORKS</a>
+            <a href="mailto:kaola.abidi@gmail.com">CONTACT</a>
+        </nav>
+    </header>
+
+    <a href="index.html" class="back-btn">← HOME</a>
+    <p class="canvas-hint" id="hint">Drag to explore · Scroll to zoom</p>
+
+    <div class="canvas-wrap" id="wrap">
+        <div class="canvas-filtered" id="canvas-filtered">
+            <div class="canvas-world" id="world">
+
+                <!-- ROW 1 -->
+                <div class="cimg" style="left:120px; top:180px; width:420px; height:300px;">
+                    <!-- Format: Paysage -->
+                    <img src="chinese shooting.png" alt="Layout 01">
+                    <div class="cimg-caption">Layout 01</div>
+                </div>
+
+                <div class="cimg" style="left:620px; top:90px; width:200px; height:260px;">
+                    <!-- Format: Portrait -->
+                    <img src="Posters/11.svg" alt="Hilda Furacão v1">
+                    <div class="cimg-caption">Hilda Furacão v1</div>
+                </div>
+
+                <div class="cimg" style="left:980px; top:260px; width:340px; height:240px;">
+                    <!-- Format: Paysage -->
+                    <img src="Ballet Tickets.png" alt="Swan Lake Tickets">
+                    <div class="cimg-caption">Swan Lake Tickets</div>
+                </div>
+
+                <div class="cimg" style="left:1450px; top:120px; width:160px; height:160px;">
+                    <!-- Format: Carré -->
+                    <img src="Logo fond rose (1).png" alt="Logo">
+                    <div class="cimg-caption">Blush Bakery Logo</div>
+                </div>
+
+                <div class="cimg" style="left:1750px; top:220px; width:460px; height:300px;">
+                    <!-- Format: Paysage -->
+                    <img src="Magazine Jenie.png" alt="Chanel campaign Jennie ">
+                    <div class="cimg-caption">Bazaar Magazine</div>
+                </div>
+
+                <div class="cimg" style="left:2420px; top:160px; width:260px; height:340px;">
+                    <!-- Format: Portrait -->
+                    <img src="Posters/13.svg" alt="Knock Out Festival Poster">
+                    <div class="cimg-caption">Knock Out</div>
+                </div>
+
+                <!-- ROW 2 -->
+                <div class="cimg" style="left:240px; top:680px; width:380px; height:240px;">
+                    <!-- Format: Paysage -->
+                    <img src="Layout blush bakery.png" alt="Layout 02">
+                    <div class="cimg-caption">Layout 02</div>
+                </div>
+
+                <div class="cimg" style="left:780px; top:520px; width:180px; height:240px;">
+                    <!-- Format: Portrait -->
+                    <img src="Posters/12.svg" alt="Michael Jackson Poster">
+                    <div class="cimg-caption">MJ</div>
+                </div>
+
+                <div class="cimg" style="left:1100px; top:660px; width:500px; height:320px;">
+                    <!-- Format: Paysage -->
+                    <img src="Magazine Spread.png" alt="Romantism">
+                    <div class="cimg-caption">Romantism</div>
+                </div>
+
+                <div class="cimg" style="left:1740px; top:600px; width:240px; height:320px;">
+                    <!-- Format: Portrait -->
+                    <img src="Identity.png"Identity">
+                    <div class="cimg-caption">Museum Identity/div>
+                </div>
+
+                <div class="cimg" style="left:2280px; top:700px; width:200px; height:280px;">
+                    <!-- Format: Portrait -->
+                    <img src="Posters/Perfect Blue.svg" alt="Perfect Blue">
+                    <div class="cimg-caption">Perfect Blue</div>
+                </div>
+
+                <!-- ROW 3 (Center) -->
+                <div class="cimg" style="left:1180px; top:1120px; width:360px; height:220px;">
+                    <!-- Format: Paysage -->
+                    <img src="Glow Up card.png" alt="Glow Up Box">
+                    <div class="cimg-caption">Glow Up Box</div>
+                </div>
+
+                <div class="cimg" style="left:180px; top:1180px; width:440px; height:260px;">
+                    <!-- Format: Paysage -->
+                    <img src="glowup.png" alt="Layout 03">
+                    <div class="cimg-caption">Layout 03</div>
+                </div>
+
+                <div class="cimg" style="left:740px; top:1040px; width:280px; height:360px;">
+                    <!-- Format: Portrait -->
+                    <img src="Posters/10.svg" alt="Breakfast at Tifanny's">
+                    <div class="cimg-caption">Breakfast at Tifanny's</div>
+                </div>
+
+                <div class="cimg" style="left:1660px; top:1080px; width:460px; height:260px;">
+                    <!-- Format: Paysage -->
+                    <img src="Yeng Layout.png" alt="Layout 04">
+                    <div class="cimg-caption">Layout 04</div>
+                </div>
+
+                <div class="cimg" style="left:2380px; top:1180px; width:220px; height:300px;">
+                    <!-- Format: Portrait -->
+                    <img src="Posters/Tract studio.svg" alt="Music Studio Tract">
+                    <div class="cimg-caption">Music Studio Tract</div>
+                </div>
+
+                <!-- ROW 4 -->
+                <div class="cimg" style="left:400px; top:1620px; width:480px; height:260px;">
+                    <!-- Format: Paysage -->
+                    <img src="coquelicot.png" alt="Reve AI">
+                    <div class="cimg-caption">Reve AI</div>
+                </div>
+
+                <div class="cimg" style="left:1020px; top:1560px; width:200px; height:260px;">
+                    <!-- Format: Portrait -->
+                    <img src="Posters/Hilda.svg" alt="Hilda Furacão v2">
+                    <div class="cimg-caption">Hilda Furacão v2</div>
+                </div>
+
+                <div class="cimg" style="left:1420px; top:1680px; width:380px; height:240px;">
+                    <!-- Format: Paysage -->
+                    <img src="Moodboard/2.png" alt="Spread 04">
+                    <div class="cimg-caption">Moodboard</div>
+                </div>
+
+                <div class="cimg" style="left:2120px; top:1580px; width:300px; height:380px;">
+                    <!-- Format: Portrait -->
+                    <img src="Posters/She wants revenge.png" alt="Identity 02">
+                    <div class="cimg-caption">Poster 02</div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="minimap" id="mm"><div class="minimap-viewport" id="mm-vp"></div></div>
+<script src="loader.js"></script>
+
+    <script>
+        const wrap      = document.getElementById('wrap');
+        const filtered  = document.getElementById('canvas-filtered');
+        const world     = document.getElementById('world');
+        const mm        = document.getElementById('mm');
+        const mmVP      = document.getElementById('mm-vp');
+        const hint      = document.getElementById('hint');
+        const displace  = document.getElementById('displace');
+        const bumpMap   = document.getElementById('bump-map');
+
+        // Dimensions mises à jour pour le nouveau layout carré
+        const WORLD_W = 2800, WORLD_H = 2100;
+        
+        // Limites de zoom resserrées
+        const MIN_S = 0.5, MAX_S = 1.8;
+
+        // Visuals (pour l'affichage en temps réel)
+        let scale = 1, panX = 0, panY = 0;
+        // Targets (pour le calcul fluide)
+        let targetScale = 1, targetPanX = 0, targetPanY = 0;
+
+        let panning = false;
+        let userInteracted = false; // Permet d'annuler l'intro si l'utilisateur agit
+        let isIntroAnim = false; // Flag pour utiliser une transition plus lente pendant l'intro
+
+        let sx = 0, sy = 0, spx = 0, spy = 0;
+        let grabX = 0, grabY = 0; 
+
+        // Valeurs animées
+        let currentBump  = 0; 
+        let targetBump   = 0;
+        let currentZoom  = 0; 
+        let targetZoom   = 0;
+        let rafId = null;
+
+        // Canvas pour générer le bump map
+        const bumpCanvas = document.createElement('canvas');
+        const bctx = bumpCanvas.getContext('2d');
+
+        function initBumpMap() {
+            // Sécurité : on force au moins 1 pixel pour éviter l'erreur IndexSizeError
+            const W = Math.max(1, window.innerWidth || document.documentElement.clientWidth);
+            const H = Math.max(1, window.innerHeight || document.documentElement.clientHeight);
+            
+            bumpCanvas.width  = W;
+            bumpCanvas.height = H;
+            bctx.clearRect(0, 0, W, H);
+
+            const imgData = bctx.createImageData(W, H);
+            const data = imgData.data;
+            const strength = 1;
+
+            for (let y = 0; y < H; y++) {
+                for (let x = 0; x < W; x++) {
+                    const nx = (x / W) * 2 - 1;
+                    const ny = (y / H) * 2 - 1;
+                    const dist = Math.sqrt(nx * nx + ny * ny);
+                    const barrel = dist * dist * strength * 0.45;
+                    const dx = nx * barrel;
+                    const dy = ny * barrel;
+                    const r = Math.round(128 + dx * 128);
+                    const g = Math.round(128 + dy * 128);
+                    const idx = (y * W + x) * 4;
+                    data[idx]     = Math.max(0, Math.min(255, r));
+                    data[idx + 1] = Math.max(0, Math.min(255, g));
+                    data[idx + 2] = 128;
+                    data[idx + 3] = 255;
+                }
+            }
+
+            bctx.putImageData(imgData, 0, 0);
+            bumpMap.setAttribute('href', bumpCanvas.toDataURL());
+            bumpMap.setAttribute('width', W);
+            bumpMap.setAttribute('height', H);
+            bumpMap.setAttribute('x', '0');
+            bumpMap.setAttribute('y', '0');
+        }
+
+        window.addEventListener('resize', initBumpMap);
+        initBumpMap();
+
+        // FOCUS sur l'image 11 (qui est maintenant positionnée à left:1180, top:1120)
+        const FOCUS_X = 1180 + 360 / 2; // 1360
+        const FOCUS_Y = 1120 + 220 / 2; // 1230
+
+        document.querySelectorAll('.cimg').forEach(el => {
+            const l = parseInt(el.style.left);
+            const t = parseInt(el.style.top);
+            const w = parseInt(el.style.width);
+            const h = parseInt(el.style.height);
+            const cx = l + w / 2;
+            const cy = t + h / 2;
+            const dist = Math.sqrt((cx - FOCUS_X) ** 2 + (cy - FOCUS_Y) ** 2);
+            const delay = (dist / 600) * 0.4; 
+            el.style.animationDelay = `${delay.toFixed(3)}s`;
+        });
+
+        const imgDataArr = [
+            {l:120,  t:180,  w:420, h:300}, {l:620,  t:90,   w:200, h:260},
+            {l:980,  t:260,  w:340, h:240}, {l:1450, t:120,  w:160, h:160},
+            {l:1750, t:220,  w:460, h:300}, {l:2420, t:160,  w:260, h:340},
+            {l:240,  t:680,  w:380, h:240}, {l:780,  t:520,  w:180, h:240},
+            {l:1100, t:660,  w:500, h:320}, {l:1740, t:600,  w:240, h:320},
+            {l:1180, t:1120, w:360, h:220}, {l:2280, t:700,  w:200, h:280},
+            {l:180,  t:1180, w:440, h:260}, {l:740,  t:1040, w:280, h:360},
+            {l:1660, t:1080, w:460, h:260}, {l:2380, t:1180, w:220, h:300},
+            {l:400,  t:1620, w:480, h:260}, {l:1020, t:1560, w:200, h:260},
+            {l:1420, t:1680, w:380, h:240}, {l:2120, t:1580, w:300, h:380},
+        ];
+        
+        const mmW = mm.offsetWidth, mmH = mm.offsetHeight;
+        const mmR = Math.min(mmW / WORLD_W, mmH / WORLD_H);
+        
+        imgDataArr.forEach(d => {
+            const dot = document.createElement('div');
+            dot.className = 'mm-img';
+            dot.style.left   = (d.l * mmR) + 'px';
+            dot.style.top    = (d.t * mmR) + 'px';
+            dot.style.width  = (d.w * mmR) + 'px';
+            dot.style.height = (d.h * mmR) + 'px';
+            mm.appendChild(dot);
+        });
+
+        function initPosition() {
+            // Intro : Dézoom partiel mais DÉJÀ centré sur l'image 11
+            targetScale = 0.65;
+            targetPanX = window.innerWidth  / 2 - FOCUS_X * targetScale;
+            targetPanY = window.innerHeight / 2 - FOCUS_Y * targetScale;
+            
+            clampTargetPan();
+            // Assigne directement pour l'état initial sans animation
+            scale = targetScale;
+            panX = targetPanX;
+            panY = targetPanY;
+            applyTransform();
+
+            // Zoom sur l'image 11 après le déploiement (1.6s)
+            setTimeout(() => {
+                // On annule si l'utilisateur a déjà interagi avec le site entre temps
+                if (userInteracted) return;
+
+                isIntroAnim = true; // Active la transition lente
+                targetScale = 0.95; 
+                targetPanX = window.innerWidth  / 2 - FOCUS_X * targetScale;
+                targetPanY = window.innerHeight / 2 - FOCUS_Y * targetScale;
+                clampTargetPan();
+                startAnim(); // Lance l'animation fluide
+            }, 1600);
+        }
+
+        function applyTransform() {
+            const zoomAdd = currentZoom * 0.06; 
+            const zoomedScale = scale * (1 + zoomAdd);
+            const adjustedPanX = grabX - (grabX - panX) * (zoomedScale / scale);
+            const adjustedPanY = grabY - (grabY - panY) * (zoomedScale / scale);
+
+            world.style.transform = `translate(${adjustedPanX}px,${adjustedPanY}px) scale(${zoomedScale})`;
+            updateMM();
+        }
+
+        function updateMM() {
+            const mw = mm.offsetWidth, mh = mm.offsetHeight;
+            const r = Math.min(mw / WORLD_W, mh / WORLD_H);
+            mmVP.style.width  = Math.min((wrap.offsetWidth  / scale) * r, mw) + 'px';
+            mmVP.style.height = Math.min((wrap.offsetHeight / scale) * r, mh) + 'px';
+            mmVP.style.left   = Math.max(0, (-panX / scale) * r) + 'px';
+            mmVP.style.top    = Math.max(0, (-panY / scale) * r) + 'px';
+        }
+
+        // Modifie uniquement les targets pour rendre l'action fluide
+        function zoomAt(cx, cy, delta) {
+            const ns = Math.min(MAX_S, Math.max(MIN_S, targetScale + delta));
+            targetPanX = cx - (cx - targetPanX) * (ns / targetScale);
+            targetPanY = cy - (cy - targetPanY) * (ns / targetScale);
+            targetScale = ns;
+            clampTargetPan();
+            startAnim();
+        }
+
+        function clampTargetPan() {
+            const margin = 50; 
+            const bottomMargin = 50; 
+            
+            const scaledW = WORLD_W * targetScale;
+            const scaledH = WORLD_H * targetScale;
+            const viewW = window.innerWidth;
+            const viewH = window.innerHeight;
+
+            // Axe X : Si la carte entière tient dans l'écran, on la centre parfaitement
+            if (scaledW < viewW) {
+                targetPanX = (viewW - scaledW) / 2;
+            } else {
+                // Sinon, on limite avec les marges classiques
+                const minPanX = viewW - scaledW - margin;
+                const maxPanX = margin;
+                targetPanX = Math.min(maxPanX, Math.max(minPanX, targetPanX));
+            }
+
+            // Axe Y : Si la carte entière tient dans l'écran, on la centre parfaitement
+            if (scaledH < viewH) {
+                targetPanY = (viewH - scaledH) / 2;
+            } else {
+                // Sinon, on limite avec les marges classiques
+                const minPanY = viewH - scaledH - bottomMargin;
+                const maxPanY = margin;
+                targetPanY = Math.min(maxPanY, Math.max(minPanY, targetPanY));
+            }
+        }
+
+        function animate() {
+            const easeIn  = 0.12;
+            const easeOut = 0.07;
+            
+            // Facteur de lissage dynamique : très doux pour l'intro (0.03), super fluide pour la navigation (0.12)
+            const lerpEase = isIntroAnim ? 0.03 : 0.12; 
+
+            const bumpEase = panning ? easeIn : easeOut;
+            const zoomEase = panning ? easeIn : easeOut;
+
+            currentBump += (targetBump - currentBump) * bumpEase;
+            currentZoom += (targetZoom - currentZoom) * zoomEase;
+
+            // Interpolation (LERP) pour une fluidité parfaite
+            scale += (targetScale - scale) * lerpEase;
+            panX += (targetPanX - panX) * lerpEase;
+            panY += (targetPanY - panY) * lerpEase;
+
+            const dispScale = currentBump * 120;
+            displace.setAttribute('scale', dispScale);
+
+            if (currentBump > 0.005) {
+                filtered.style.filter = 'url(#sphere-filter)';
+            } else {
+                filtered.style.filter = 'none';
+            }
+
+            applyTransform();
+
+            const stillAnimating =
+                Math.abs(currentBump - targetBump) > 0.001 ||
+                Math.abs(currentZoom - targetZoom) > 0.001 ||
+                Math.abs(targetScale - scale) > 0.001 ||
+                Math.abs(targetPanX - panX) > 0.1 || // Précision accrue pour une fin de mouvement très douce
+                Math.abs(targetPanY - panY) > 0.1;
+
+            if (stillAnimating || panning) {
+                rafId = requestAnimationFrame(animate);
+            } else {
+                currentBump = targetBump;
+                currentZoom = targetZoom;
+                scale = targetScale;
+                panX = targetPanX;
+                panY = targetPanY;
+                filtered.style.filter = 'none';
+                isIntroAnim = false; // Fin de l'intro
+                applyTransform();
+                rafId = null;
+            }
+        }
+
+        function startAnim() {
+            if (!rafId) rafId = requestAnimationFrame(animate);
+        }
+
+        wrap.addEventListener('mousedown', e => {
+            userInteracted = true;
+            isIntroAnim = false; // Annule la lenteur de l'intro
+            panning = true;
+            sx = e.clientX; sy = e.clientY;
+            spx = targetPanX; spy = targetPanY;
+            grabX = e.clientX; grabY = e.clientY;
+            targetBump = 1;
+            targetZoom = 1;
+            wrap.style.cursor = 'grabbing';
+            startAnim();
+        });
+
+        document.addEventListener('mousemove', e => {
+            if (!panning) return;
+            if (Math.abs(e.clientX - sx) > 3 || Math.abs(e.clientY - sy) > 3) hint.classList.add('hidden');
+            targetPanX = spx + (e.clientX - sx);
+            targetPanY = spy + (e.clientY - sy);
+            clampTargetPan();
+            grabX = e.clientX; grabY = e.clientY;
+        });
+
+        document.addEventListener('mouseup', () => {
+            panning = false;
+            targetBump = 0;
+            targetZoom = 0;
+            wrap.style.cursor = 'default';
+            startAnim();
+        });
+
+        wrap.addEventListener('wheel', e => {
+            userInteracted = true;
+            isIntroAnim = false; // Annule la lenteur de l'intro
+            e.preventDefault(); hint.classList.add('hidden');
+            
+            // Heuristique : Différencier une vraie molette d'un glissement de trackpad
+            const isMouseWheel = e.deltaMode !== 0 || (e.deltaX === 0 && e.deltaY % 10 === 0 && Math.abs(e.deltaY) >= 40);
+            
+            if (e.ctrlKey || isMouseWheel) {
+                // Pinch-to-zoom (trackpad avec pincement) OU Molette classique
+                zoomAt(e.clientX, e.clientY, -e.deltaY * 0.002);
+            } else {
+                // Navigation avec 2 doigts (trackpad), mouvement naturel 1:1
+                targetPanX -= e.deltaX; 
+                targetPanY -= e.deltaY;
+                clampTargetPan();
+                startAnim();
+            }
+        }, { passive: false });
+
+        let t0d=0,t0s=1,t0px=0,t0py=0,t0cx=0,t0cy=0;
+        wrap.addEventListener('touchstart', e => {
+            userInteracted = true;
+            isIntroAnim = false; // Annule la lenteur de l'intro
+            if(e.touches.length===1){
+                panning=true; sx=e.touches[0].clientX; sy=e.touches[0].clientY;
+                spx=targetPanX; spy=targetPanY;
+                grabX=e.touches[0].clientX; grabY=e.touches[0].clientY;
+                targetBump=1; targetZoom=1; startAnim();
+            } else if(e.touches.length===2){
+                panning=false;
+                const dx=e.touches[0].clientX-e.touches[1].clientX;
+                const dy=e.touches[0].clientY-e.touches[1].clientY;
+                t0d=Math.hypot(dx,dy); t0s=targetScale; t0px=targetPanX; t0py=targetPanY;
+                t0cx=(e.touches[0].clientX+e.touches[1].clientX)/2;
+                t0cy=(e.touches[0].clientY+e.touches[1].clientY)/2;
+            }
+        },{passive:true});
+        
+        wrap.addEventListener('touchmove', e => {
+            if(e.touches.length===1&&panning){
+                targetPanX=spx+(e.touches[0].clientX-sx); targetPanY=spy+(e.touches[0].clientY-sy);
+                clampTargetPan();
+                grabX=e.touches[0].clientX; grabY=e.touches[0].clientY;
+            } else if(e.touches.length===2){
+                const dx=e.touches[0].clientX-e.touches[1].clientX;
+                const dy=e.touches[0].clientY-e.touches[1].clientY;
+                const ns=Math.min(MAX_S,Math.max(MIN_S,t0s*(Math.hypot(dx,dy)/t0d)));
+                targetPanX=t0cx-(t0cx-t0px)*(ns/t0s); targetPanY=t0cy-(t0cy-t0py)*(ns/t0s);
+                targetScale=ns;
+                clampTargetPan();
+                startAnim();
+            }
+        },{passive:true});
+        
+        wrap.addEventListener('touchend', () => {
+            panning=false; targetBump=0; targetZoom=0; startAnim();
+        });
+
+        initPosition();
+    </script>
+</body>
+</html>
